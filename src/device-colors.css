@@ -1,0 +1,136 @@
+/* Shell and control palettes referenced from the product renders at
+   https://droix.net/product/ayn-thor/ (Black, White, Rainbow, Clear Purple).
+   These tokens only style the physical mockup and selector, never the canvases. */
+/* Register colors so gradient stops interpolate instead of switching abruptly.
+   Only the preview opts into transitions; the selector swatches stay immediate. */
+@property --thor-shell-light { syntax: "<color>"; inherits: true; initial-value: #eeece8; }
+@property --thor-shell-mid { syntax: "<color>"; inherits: true; initial-value: #deddd9; }
+@property --thor-shell-dark { syntax: "<color>"; inherits: true; initial-value: #b9b7b4; }
+@property --thor-shell-border { syntax: "<color>"; inherits: true; initial-value: #b4b2af; }
+@property --thor-highlight { syntax: "<color>"; inherits: true; initial-value: #ffffffcc; }
+@property --thor-control-light { syntax: "<color>"; inherits: true; initial-value: #85847f; }
+@property --thor-control-mid { syntax: "<color>"; inherits: true; initial-value: #686762; }
+@property --thor-control-dark { syntax: "<color>"; inherits: true; initial-value: #45443f; }
+@property --thor-control-text { syntax: "<color>"; inherits: true; initial-value: #ffffff; }
+@property --thor-control-well { syntax: "<color>"; inherits: true; initial-value: #d5d3cd; }
+@property --thor-stick-light { syntax: "<color>"; inherits: true; initial-value: #75746f; }
+@property --thor-stick-mid { syntax: "<color>"; inherits: true; initial-value: #66655f; }
+@property --thor-stick-dark { syntax: "<color>"; inherits: true; initial-value: #51514c; }
+@property --thor-stick-ring { syntax: "<color>"; inherits: true; initial-value: #bce3e6; }
+@property --thor-x-light { syntax: "<color>"; inherits: true; initial-value: #85847f; }
+@property --thor-x-dark { syntax: "<color>"; inherits: true; initial-value: #45443f; }
+@property --thor-y-light { syntax: "<color>"; inherits: true; initial-value: #85847f; }
+@property --thor-y-dark { syntax: "<color>"; inherits: true; initial-value: #45443f; }
+@property --thor-a-light { syntax: "<color>"; inherits: true; initial-value: #85847f; }
+@property --thor-a-dark { syntax: "<color>"; inherits: true; initial-value: #45443f; }
+@property --thor-b-light { syntax: "<color>"; inherits: true; initial-value: #85847f; }
+@property --thor-b-dark { syntax: "<color>"; inherits: true; initial-value: #45443f; }
+@property --thor-inner-highlight { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --thor-inner-shadow { syntax: "<color>"; inherits: true; initial-value: transparent; }
+
+.device {
+  transition-property:
+    --thor-shell-light, --thor-shell-mid, --thor-shell-dark, --thor-shell-border,
+    --thor-highlight, --thor-control-light, --thor-control-mid, --thor-control-dark,
+    --thor-control-text, --thor-control-well,
+    --thor-stick-light, --thor-stick-mid, --thor-stick-dark, --thor-stick-ring,
+    --thor-x-light, --thor-x-dark, --thor-y-light, --thor-y-dark,
+    --thor-a-light, --thor-a-dark, --thor-b-light, --thor-b-dark,
+    --thor-inner-highlight, --thor-inner-shadow;
+  transition-duration: 220ms;
+  transition-timing-function: ease-out;
+}
+
+[data-device-color] {
+  --thor-shell-light: #eeece8;
+  --thor-shell-mid: #deddd9;
+  --thor-shell-dark: #b9b7b4;
+  --thor-shell-border: #b4b2af;
+  --thor-highlight: #ffffffcc;
+  --thor-inner-highlight: transparent;
+  --thor-inner-shadow: transparent;
+  --thor-control-light: #85847f;
+  --thor-control-mid: #686762;
+  --thor-control-dark: #45443f;
+  --thor-control-text: #ffffff;
+  --thor-control-well: #d5d3cd;
+  --thor-stick-light: #75746f;
+  --thor-stick-mid: #66655f;
+  --thor-stick-dark: #51514c;
+  --thor-stick-ring: #bce3e6;
+  --thor-x-light: var(--thor-control-light);
+  --thor-x-dark: var(--thor-control-dark);
+  --thor-y-light: var(--thor-control-light);
+  --thor-y-dark: var(--thor-control-dark);
+  --thor-a-light: var(--thor-control-light);
+  --thor-a-dark: var(--thor-control-dark);
+  --thor-b-light: var(--thor-control-light);
+  --thor-b-dark: var(--thor-control-dark);
+}
+
+[data-device-color="rainbow"] {
+  --thor-x-light: #3868bd;
+  --thor-x-dark: #23428e;
+  --thor-y-light: #519d6f;
+  --thor-y-dark: #32734d;
+  --thor-a-light: #c64b47;
+  --thor-a-dark: #a32b2b;
+  --thor-b-light: #e7c447;
+  --thor-b-dark: #c8a329;
+}
+
+[data-device-color="black"] {
+  --thor-shell-light: #37383a;
+  --thor-shell-mid: #252628;
+  --thor-shell-dark: #151618;
+  --thor-shell-border: #111214;
+  --thor-highlight: #ffffff30;
+  --thor-control-light: #434448;
+  --thor-control-mid: #2c2d30;
+  --thor-control-dark: #151619;
+  --thor-control-well: #1c1d20;
+  --thor-stick-light: #393a3d;
+  --thor-stick-mid: #27282b;
+  --thor-stick-dark: #16171a;
+}
+
+[data-device-color="white"] {
+  --thor-shell-light: #fcfcfb;
+  --thor-shell-mid: #eeefed;
+  --thor-shell-dark: #d5d7d4;
+  --thor-shell-border: #bfc2be;
+  --thor-control-light: #ffffff;
+  --thor-control-mid: #eeefec;
+  --thor-control-dark: #babdb8;
+  --thor-control-text: #777b76;
+  --thor-control-well: #e3e5e1;
+  --thor-stick-light: #a2a49f;
+  --thor-stick-mid: #878a84;
+  --thor-stick-dark: #696d66;
+  --thor-stick-ring: #e9dfce;
+}
+
+[data-device-color="clear-purple"] {
+  --thor-shell-light: #80788f;
+  --thor-shell-mid: #5c536f;
+  --thor-shell-dark: #383047;
+  --thor-shell-border: #443954;
+  --thor-highlight: #d9c6ff45;
+  --thor-inner-highlight: #d8d0e510;
+  --thor-inner-shadow: #30263f24;
+  --thor-control-light: #424148;
+  --thor-control-mid: #2b2a30;
+  --thor-control-dark: #16151b;
+  --thor-control-well: #494152;
+  --thor-stick-light: #38363e;
+  --thor-stick-mid: #26242c;
+  --thor-stick-dark: #16141c;
+  --thor-stick-ring: #cbb2ec;
+}
+
+/* Keep the same rim geometry for every finish. Clear Purple's subtle inner
+   detail fades through color alone, underneath the screens and controls. */
+.device .deck-bottom::before {
+  background: linear-gradient(90deg, var(--thor-inner-highlight) 24%, transparent 24% 76%, var(--thor-inner-highlight) 76%);
+  box-shadow: inset 0 0 0 0.25cqw var(--thor-inner-shadow), inset 0 -0.8cqw 0 var(--thor-inner-shadow);
+}
