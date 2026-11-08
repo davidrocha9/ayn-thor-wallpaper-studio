@@ -14,7 +14,7 @@ function normalizeHex(value: string) {
 }
 
 export function BackdropField() {
-  const { layer, updateFraming, isRestoring } = useStudioContext()
+  const { activeFraming: layer, updateFraming, isRestoring, exporting } = useStudioContext()
   const [draft, setDraft] = useState<string | null>(null)
   const invalid = draft !== null && normalizeHex(draft) === null
 
@@ -26,7 +26,7 @@ export function BackdropField() {
           type="color"
           aria-label="Choose any backdrop color"
           value={layer.bg}
-          disabled={isRestoring}
+          disabled={isRestoring || exporting}
           onChange={(event) => {
             setDraft(null)
             updateFraming({ bg: event.target.value })
@@ -35,7 +35,7 @@ export function BackdropField() {
         />
         <Input
           id="backdrop-hex"
-          disabled={isRestoring}
+          disabled={isRestoring || exporting}
           aria-label="Backdrop hex color"
           aria-invalid={invalid}
           aria-describedby={invalid ? 'backdrop-hint' : undefined}

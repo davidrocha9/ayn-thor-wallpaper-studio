@@ -1,11 +1,11 @@
 import { useEffect, useEffectEvent, useRef, type PointerEvent } from 'react'
 
-import { clamp, type Layer } from '@/lib/thor'
+import { clamp, type Framing } from '@/lib/thor'
 
 interface FramingGestureOptions {
-  layer: Layer
+  layer: Framing
   disabled: boolean
-  updateFraming: (patch: Partial<Layer>) => void
+  updateFraming: (patch: Partial<Framing>) => void
   scaleX?: number
   scaleY?: number
 }

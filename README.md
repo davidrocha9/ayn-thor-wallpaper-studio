@@ -24,7 +24,7 @@ Free to use, works on desktop and mobile, and processes your files locally in yo
 ## How to use it
 
 1. **Import media.** Click **Import media** or drop an image or video onto the page. Select a thumbnail to use it across both screens.
-2. **Frame your wallpaper.** Set screen alignment in the main tools, alongside colorway, fit, zoom, rotation, and backdrop. You can also drag either screen to pan; on desktop, scroll over a screen to zoom.
+2. **Frame your wallpaper.** Leave **Link screens** on to edit both displays together, or turn it off and choose **Top** or **Bottom** to adjust either screen’s portion independently. Toggling never re-fits, duplicates, or moves the wallpaper: each screen keeps its current crop of the spanning background. Drag a screen to pan; on desktop, scroll over it to zoom. While unlinked, these gestures affect only that screen. Re-linking keeps independent adjustments and applies subsequent motion to both crops together. Settings stay saved after a reload.
 3. **Optionally cut the source.** Click the **crop icon on a library item**, move or resize the selection over the original, then click **Apply crop**. This updates the same library item without creating a new image or resetting your wallpaper framing. The original file, crop selection, and aspect-ratio preference stay saved. Reopen cropping to adjust the selection, or choose **Restore original** and apply to remove the crop. **Cancel** discards the selection without changing your wallpaper. The selection follows the Thor aspect ratio by default; unlock it for a free crop.
 4. **Export both screens.** Open **Export settings** to choose a format, then click **Export both screens** to download the matching files.
 5. **Apply them on your Thor.** Transfer the exported files to your device and set the wallpapers yourself; this tool doesn’t apply them automatically.
@@ -36,7 +36,7 @@ Free to use, works on desktop and mobile, and processes your files locally in yo
 
 ### Source size and screen alignment
 
-New workspaces use **With screen gap**: the two screen regions account for their different pixel densities and skip the image area behind the hinge and bezels. This mode uses a **16 mm** gap by default, the midpoint of an approximate **15–17 mm** owner measurement. Screen proportions are derived from AYN’s advertised 6-inch and 3.92-inch diagonals; alignment is approximate and can vary with viewing angle and launcher scaling.
+With **Link screens** on, new workspaces use **With screen gap**: the two screen regions account for their different pixel densities and skip the image area behind the hinge and bezels. This mode uses a **16 mm** gap by default, the midpoint of an approximate **15–17 mm** owner measurement. Screen proportions are derived from AYN’s advertised 6-inch and 3.92-inch diagonals; alignment is approximate and can vary with viewing angle and launcher scaling.
 
 At the default gap, **about 1920 × 2257** is a useful source shape. Larger sources with the same aspect ratio provide more detail, and other dimensions work too: Cover crops the excess, while Contain keeps the full source with a backdrop. Cropping is reversible for images, videos, and animated GIFs: a saved source selection is applied to previews and exported frames while the original stays intact. Applying a crop does not encode a new source file or use another library slot.
 
@@ -46,7 +46,7 @@ Cover, Contain, and Stretch are available in either alignment. Switching alignme
 
 Images export as **PNG, JPEG, or WebP**. Videos can export as a still frame or a **2–15 second clip** at 30 or 60 fps. Clip support and format depend on your browser; Chrome or Edge is recommended. Keep the tab visible while recording a clip.
 
-The library holds up to **24 files**, with **six per page**. Both screens always share one wallpaper and the same framing adjustments.
+The library holds up to **24 files**, with **six per page**. Both screens share the selected source file and spanning coordinate system, with either linked or independent adjustments. Screen alignment can be changed while linked and remains in effect when unlinked. **Reset framing** resets the shared composition while linked, or only the selected screen while independent.
 
 ## Privacy and saved files
 

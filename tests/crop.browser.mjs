@@ -438,6 +438,160 @@ test('all fits remain available and unchanged across alignment switches and relo
   } finally { await context.close() }
 })
 
+for (const mobile of [false, true]) {
+  test(`linked and independent framing retain settings and target the right screen (${mobile ? 'phone' : 'desktop'})`, async () => {
+    const { context, page, errors } = await workspace(mobile ? { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true } : {})
+    try {
+      await importCalibration(page)
+      const tools = page.locator('.control-panel')
+      const link = tools.getByRole('switch', { name: 'Link screens', exact: true })
+      const fitHeading = tools.locator('label').filter({ hasText: /^Fit$/ }).locator('..')
+      assert.equal(await fitHeading.locator('span').count(), 0, 'Fit has no redundant trailing value')
+      assert.equal(await link.isChecked(), true)
+      const switchBounds = await link.boundingBox()
+      assert.ok(switchBounds.width > switchBounds.height, 'switch keeps its pill shape on touch devices')
+      await tools.getByRole('radio', { name: 'Stretch', exact: true }).click()
+      await link.uncheck()
+      const top = tools.getByRole('radio', { name: 'Top', exact: true })
+      const bottom = tools.getByRole('radio', { name: 'Bottom', exact: true })
+      const zoom = tools.getByRole('slider', { name: 'Zoom', exact: true })
+      assert.equal(await top.getAttribute('aria-checked'), 'true')
+      assert.equal(await tools.getByRole('radio', { name: 'With screen gap', exact: true }).count(), 0)
+      await tools.getByRole('button', { name: '↻ 90°', exact: true }).click()
+      await tools.getByRole('button', { name: '↻ 90°', exact: true }).click()
+      await bottom.click()
+      assert.equal(await tools.getByText('0°', { exact: true }).isVisible(), true)
+      await tools.getByRole('radio', { name: 'Contain', exact: true }).click()
+      await zoom.focus()
+      await page.keyboard.press('ArrowRight')
+      assert.equal(await zoom.getAttribute('aria-valuenow'), '101')
+      await top.click()
+      assert.equal(await zoom.getAttribute('aria-valuenow'), '100')
+      assert.equal(await tools.getByText('180°', { exact: true }).isVisible(), true)
+      assert.equal(await tools.getByRole('radio', { name: 'Stretch', exact: true }).getAttribute('aria-checked'), 'true')
+      await link.check()
+      assert.equal(await tools.getByText('180°', { exact: true }).isVisible(), true, 'relinking keeps the current crop')
+      await link.uncheck()
+      assert.equal(await tools.getByText('180°', { exact: true }).isVisible(), true)
+      let saved = await savedWorkspace(page)
+      assert.equal(saved.settings.layer.linked, false)
+      assert.equal(saved.settings.layer.screenFraming.top.rotation, 180)
+      assert.equal(saved.settings.layer.screenFraming.bottom.zoom, 1.01)
+      await page.reload()
+      await ready(page)
+      assert.equal(await link.isChecked(), false)
+      assert.equal(await tools.getByText('180°', { exact: true }).isVisible(), true)
+      await bottom.click()
+      assert.equal(await zoom.getAttribute('aria-valuenow'), '101')
+      await tools.getByRole('radio', { name: 'Stretch', exact: true }).click()
+      await tools.getByRole('button', { name: 'Reset framing', exact: true }).click()
+      await tools.getByRole('radio', { name: 'Stretch', exact: true }).click()
+      saved = await savedWorkspace(page)
+      assert.equal(saved.settings.layer.screenFraming.top.rotation, 180, 'reset only affects the selected screen')
+      await page.waitForFunction(() => {
+        const pixel = (key) => document.querySelector(`[data-screen="${key}"] canvas`).getContext('2d').getImageData(300, 100, 1, 1).data
+        return pixel('top')[2] === 255 && pixel('bottom')[2] === 255
+      })
+      if (!mobile) {
+        const files = await exportDownloads(page)
+        for (const [i, file] of files.entries()) {
+          const sample = await page.evaluate(async ({ base64 }) => {
+            const image = new Image()
+            image.src = `data:image/png;base64,${base64}`
+            await image.decode()
+            const canvas = document.createElement('canvas')
+            canvas.width = image.naturalWidth; canvas.height = image.naturalHeight
+            const ctx = canvas.getContext('2d')
+            ctx.drawImage(image, 0, 0)
+            return { size: [canvas.width, canvas.height], pixel: [...ctx.getImageData(canvas.width / 2, 200, 1, 1).data].slice(0, 3) }
+          }, file)
+          assert.deepEqual(sample.size, [i ? 1240 : 1920, 1080])
+          assert.deepEqual(sample.pixel, [0, 0, 255])
+        }
+        const bottomPreview = page.locator('[data-screen="bottom"]')
+        const bounds = await bottomPreview.boundingBox()
+        await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+        await page.mouse.wheel(0, -100)
+        await page.waitForFunction(() => document.querySelector('[aria-label="Zoom"]').getAttribute('aria-valuenow') !== '100')
+        await dragBy(page, bottomPreview, 20, 10)
+        const gestured = await savedWorkspace(page)
+        assert.equal(gestured.settings.layer.screenFraming.top.zoom, 1)
+        assert.equal(gestured.settings.layer.screenFraming.top.offsetX, 0)
+        assert.ok(gestured.settings.layer.screenFraming.bottom.zoom > 1)
+        assert.ok(gestured.settings.layer.screenFraming.bottom.offsetX > 0)
+        // Linked gestures on either preview still move the whole composition.
+        await link.check()
+        const sharedBefore = (await savedWorkspace(page)).settings.layer
+        await dragBy(page, bottomPreview, -10, -5)
+        const sharedAfter = (await savedWorkspace(page)).settings.layer
+        const topDelta = sharedAfter.screenFraming.top.offsetX - sharedBefore.screenFraming.top.offsetX
+        const bottomDelta = sharedAfter.screenFraming.bottom.offsetX - sharedBefore.screenFraming.bottom.offsetX
+        assert.ok(topDelta < 0)
+        assert.ok(Math.abs(topDelta - bottomDelta) < 1e-12, 'linked drags move both crops by the same amount')
+        await link.uncheck()
+      }
+      await screenshot(page, `screen-framing-${mobile ? 'mobile' : 'desktop'}.png`)
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+      assert.deepEqual(errors, [])
+    } finally { await context.close() }
+  })
+}
+
+test('independent video previews, stills, and clips render each screen framing', async () => {
+  const { context, page, errors } = await workspace()
+  try {
+    const videoBytes = await page.evaluate(async () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 640; canvas.height = 480
+      const ctx = canvas.getContext('2d')
+      const stream = canvas.captureStream(10)
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' })
+      const chunks = []
+      recorder.ondataavailable = (event) => chunks.push(event.data)
+      const stopped = new Promise((resolve) => { recorder.onstop = resolve })
+      recorder.start()
+      for (let frame = 0; frame < 6; frame++) {
+        ctx.fillStyle = '#0000ff'; ctx.fillRect(0, 0, 640, 480)
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+      recorder.stop()
+      await stopped
+      stream.getTracks().forEach((track) => track.stop())
+      return [...new Uint8Array(await new Blob(chunks).arrayBuffer())]
+    })
+    await page.locator('input[type="file"]').setInputFiles({ name: 'independent.webm', mimeType: 'video/webm', buffer: Buffer.from(videoBytes) })
+    await page.getByRole('button', { name: 'Use independent.webm', exact: true }).waitFor()
+    const tools = page.locator('.control-panel')
+    await tools.getByRole('radio', { name: 'Stretch', exact: true }).click()
+    await tools.getByRole('switch', { name: 'Link screens', exact: true }).uncheck()
+    await tools.getByRole('textbox', { name: 'Backdrop hex color', exact: true }).fill('#ff0000')
+    await tools.getByRole('textbox', { name: 'Backdrop hex color', exact: true }).blur()
+    await tools.getByRole('slider', { name: 'X position', exact: true }).focus()
+    await page.keyboard.press('End')
+    await page.waitForFunction(() => {
+      const pixel = (key) => document.querySelector(`[data-screen="${key}"] canvas`).getContext('2d').getImageData(300, 100, 1, 1).data
+      return pixel('top')[0] > 240 && pixel('bottom')[2] > 240
+    })
+    for (const clip of [false, true]) {
+      if (clip) {
+        await page.getByRole('button', { name: 'Export settings', exact: true }).click()
+        const settings = page.getByRole('dialog')
+        await settings.getByText('Live clip', { exact: true }).click()
+        await settings.getByRole('slider', { name: 'Clip length', exact: true }).focus()
+        await page.keyboard.press('Home')
+        await settings.getByRole('button', { name: 'Done', exact: true }).click()
+      }
+      const files = await exportDownloads(page)
+      for (const [i, file] of files.entries()) {
+        const result = await inspectOutput(page, file, clip)
+        assert.deepEqual([result.width, result.height], [i ? 1240 : 1920, 1080])
+        assertColor(result.pixels, i ? [0, 0, 255] : [255, 0, 0], 15)
+      }
+    }
+    assert.deepEqual(errors, [])
+  } finally { await context.close() }
+})
+
 test('video crop preview, still frames, and recorded clips use the physical layout', async () => {
   const { context, page, errors } = await workspace()
   try {

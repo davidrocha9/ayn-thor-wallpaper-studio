@@ -5,7 +5,7 @@ import { normalizeWorkspaceSettings } from '../src/lib/studio-storage.ts'
 
 const valid = {
   deviceColor: 'clear-purple',
-  layer: { layout: 'physical', gapMm: 16, mediaId: 'saved-image', fit: 'contain', zoom: 1.75, offsetX: -0.3, offsetY: 0.4, rotation: 270, bg: '#A1B2C3' },
+  layer: { linked: true, screenFraming: null, layout: 'physical', gapMm: 16, mediaId: 'saved-image', fit: 'contain', zoom: 1.75, offsetX: -0.3, offsetY: 0.4, rotation: 270, bg: '#A1B2C3' },
   stillFormat: 'jpeg', quality: 0.8, videoOutput: 'clip', clipDuration: 12, clipFps: 60, loop: false,
 }
 
@@ -16,7 +16,7 @@ test('saved framing and export preferences round trip without changes', () => {
 test('an empty or malformed workspace gets usable defaults', () => {
   const expected = {
     deviceColor: 'rainbow',
-    layer: { layout: 'physical', gapMm: 16, mediaId: null, fit: 'cover', zoom: 1, offsetX: 0, offsetY: 0, rotation: 0, bg: '#000000' },
+    layer: { linked: true, screenFraming: null, layout: 'physical', gapMm: 16, mediaId: null, fit: 'cover', zoom: 1, offsetX: 0, offsetY: 0, rotation: 0, bg: '#000000' },
     stillFormat: 'png', quality: 0.92, videoOutput: 'still', clipDuration: 6, clipFps: 30, loop: true,
   }
   for (const value of [undefined, null, false, 42, 'invalid', {}]) {
@@ -30,7 +30,7 @@ test('out-of-range and non-finite stored settings cannot break the canvas', () =
     quality: -1, clipDuration: Infinity, clipFps: 120, loop: 'false', stillFormat: 'svg', videoOutput: 'invalid',
   })
   assert.deepEqual(settings.layer, {
-    layout: 'continuous', gapMm: 16, mediaId: null, fit: 'cover', zoom: 4, offsetX: -1, offsetY: 0, rotation: 0, bg: '#000000',
+    linked: true, screenFraming: null, layout: 'continuous', gapMm: 16, mediaId: null, fit: 'cover', zoom: 4, offsetX: -1, offsetY: 0, rotation: 0, bg: '#000000',
   })
   assert.equal(settings.quality, 0.5)
   assert.equal(settings.clipDuration, 6)

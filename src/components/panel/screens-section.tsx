@@ -1,8 +1,9 @@
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useStudioContext } from '@/components/studio-context'
-import { FITS, type Fit } from '@/lib/thor'
+import { FITS, SCREEN_KEYS, SCREENS, type Fit } from '@/lib/thor'
 import { BackdropField } from './backdrop-field'
 import { DeviceColorField } from './device-color-field'
 import { ScreenAlignmentField } from './screen-alignment-field'
@@ -15,18 +16,44 @@ const segmentItemClass =
   'h-8 flex-1 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-background/60 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm'
 
 export function ScreensSection() {
-  const { layer, hasMedia, exporting, updateFraming } = useStudioContext()
-  const disabled = !hasMedia || exporting
+  const {
+    layer: composition, activeFraming: layer, activeScreen, setActiveScreen,
+    setLinked, hasMedia, exporting, isRestoring, updateFraming,
+  } = useStudioContext()
+  const disabled = !hasMedia || exporting || isRestoring
 
   return (
-    <Section className="flex flex-1 flex-col justify-between gap-3 border-0 py-0 [&>*]:mt-0">
+    <Section className="flex flex-1 flex-col justify-between gap-2 border-0 py-0 [&>*]:mt-0">
       <DeviceColorField />
-      <ScreenAlignmentField />
       <Field>
-        <FieldTop
-          label="Fit"
-          value={layer.fit.charAt(0).toUpperCase() + layer.fit.slice(1)}
-        />
+        <div className="flex min-h-8 items-center justify-between gap-3">
+          <label htmlFor="link-screens" className="text-xs font-medium">Link screens</label>
+          <Switch id="link-screens" className="mr-3" checked={composition.linked} disabled={disabled} onCheckedChange={setLinked} />
+        </div>
+      </Field>
+      {composition.linked ? <ScreenAlignmentField /> : (
+        <Field>
+          <FieldTop label="Editing screen" />
+          <ToggleGroup
+            type="single"
+            aria-label="Editing screen"
+            value={activeScreen}
+            disabled={disabled}
+            className={segmentedClass}
+            onValueChange={(value) => {
+              if (value === 'top' || value === 'bottom') setActiveScreen(value)
+            }}
+          >
+            {SCREEN_KEYS.map((key) => (
+              <ToggleGroupItem key={key} value={key} className={segmentItemClass}>
+                {SCREENS[key].label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </Field>
+      )}
+      <Field>
+        <FieldTop label="Fit" />
         <ToggleGroup
           type="single"
           value={layer.fit}
@@ -122,7 +149,7 @@ export function ScreensSection() {
         ))}
       </Field>
 
-      <BackdropField />
+      <BackdropField key={composition.linked ? 'linked' : activeScreen} />
     </Section>
   )
 }

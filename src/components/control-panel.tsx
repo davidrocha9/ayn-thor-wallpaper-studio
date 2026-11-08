@@ -23,12 +23,9 @@ export function ControlPanel() {
             <TooltipContent>Reset framing</TooltipContent>
           </Tooltip>
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          Turn an image or video into wallpapers for both AYN Thor screens.
-        </p>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
-        <div className="framing-controls thin-scroll flex min-h-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-col gap-3 px-4 py-3">
+        <div className="framing-controls flex min-w-0 flex-col">
           <ScreensSection />
         </div>
         <ExportSection />

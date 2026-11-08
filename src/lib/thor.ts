@@ -82,16 +82,24 @@ export type StillFormat = 'png' | 'jpeg' | 'webp'
 export type VideoOutput = 'still' | 'clip'
 export type MediaKind = 'image' | 'video'
 
-export interface Layer {
-  layout: LayoutMode
-  gapMm: number
-  mediaId: string | null
+export interface Framing {
   fit: Fit
   zoom: number
   offsetX: number
   offsetY: number
   rotation: number
   bg: string
+  /** Scene-space translation keeping independent zoom centered on its screen. */
+  zoomOffsetX?: number
+  zoomOffsetY?: number
+}
+
+export interface Layer extends Framing {
+  layout: LayoutMode
+  gapMm: number
+  mediaId: string | null
+  linked: boolean
+  screenFraming: Record<ScreenKey, Framing> | null
 }
 
 export interface MediaItem {
@@ -114,6 +122,8 @@ export const defaultLayer = (): Layer => ({
   layout: 'physical',
   gapMm: DEFAULT_GAP_MM,
   mediaId: null,
+  linked: true,
+  screenFraming: null,
   fit: 'cover',
   zoom: 1,
   offsetX: 0,
@@ -121,6 +131,63 @@ export const defaultLayer = (): Layer => ({
   rotation: 0,
   bg: '#000000',
 })
+
+/** Linking controls edits only; both screens keep their current scene-space crop. */
+export function setScreensLinked(layer: Layer, linked: boolean): Layer {
+  if (linked || layer.screenFraming) return { ...layer, linked }
+  const { fit, zoom, offsetX, offsetY, rotation, bg } = layer
+  const framing = { fit, zoom, offsetX, offsetY, rotation, bg }
+  return { ...layer, linked, screenFraming: { top: { ...framing }, bottom: { ...framing } } }
+}
+
+export function getScreenFraming(layer: Layer, key: ScreenKey): Framing {
+  return layer.screenFraming ? layer.screenFraming[key] : layer
+}
+
+export function patchScreenFraming(layer: Layer, patch: Partial<Framing>, key: ScreenKey): Layer {
+  if (layer.linked && !layer.screenFraming) return { ...layer, ...patch }
+  const initialized = layer.screenFraming ? layer : setScreensLinked(layer, false)
+  const origin = getScreenFraming(initialized, key)
+  const apply = (screen: ScreenKey): Framing => {
+    const current = getScreenFraming(initialized, screen)
+    if (screen === key) {
+      if (layer.linked || patch.zoom === undefined || patch.zoom === current.zoom) return { ...current, ...patch }
+      const layout = getSpanLayout(layer)
+      const region = layout.regions[screen]
+      const pivotX = (region.x + region.width / 2) / layout.width - 0.5
+      const pivotY = (region.y + region.height / 2) / layout.height - 0.5
+      const ratio = patch.zoom / current.zoom
+      const centerX = current.offsetX + (current.zoomOffsetX ?? 0)
+      const centerY = current.offsetY + (current.zoomOffsetY ?? 0)
+      return {
+        ...current, ...patch,
+        zoomOffsetX: pivotX + (centerX - pivotX) * ratio - current.offsetX,
+        zoomOffsetY: pivotY + (centerY - pivotY) * ratio - current.offsetY,
+      }
+    }
+    if (!layer.linked) return current
+    // Apply the same motion to both crops, retaining any independent adjustment.
+    return {
+      ...current,
+      ...patch,
+      zoom: patch.zoom === undefined || current.zoom === origin.zoom
+        ? patch.zoom ?? current.zoom
+        : clamp(current.zoom * (patch.zoom / origin.zoom), 0.5, 4),
+      offsetX: patch.offsetX === undefined || current.offsetX === origin.offsetX
+        ? patch.offsetX ?? current.offsetX
+        : clamp(current.offsetX + (patch.offsetX - origin.offsetX), -1, 1),
+      offsetY: patch.offsetY === undefined || current.offsetY === origin.offsetY
+        ? patch.offsetY ?? current.offsetY
+        : clamp(current.offsetY + (patch.offsetY - origin.offsetY), -1, 1),
+      rotation: patch.rotation === undefined ? current.rotation : (current.rotation + patch.rotation - origin.rotation + 360) % 360,
+    }
+  }
+  return {
+    ...initialized,
+    ...(layer.linked ? patch : {}),
+    screenFraming: { top: apply('top'), bottom: apply('bottom') },
+  }
+}
 
 export const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value))
@@ -169,7 +236,7 @@ export function drawSpanRegion(
 
 export function drawScene(
   ctx: CanvasRenderingContext2D,
-  layer: Layer,
+  layer: Framing,
   item: MediaItem | null,
 ) {
   const W = ctx.canvas.width
@@ -231,7 +298,8 @@ export function drawScene(
   sy *= layer.zoom
 
   ctx.save()
-  ctx.translate(W / 2 + layer.offsetX * W, H / 2 + layer.offsetY * H)
+  ctx.translate(W / 2 + (layer.offsetX + (layer.zoomOffsetX ?? 0)) * W,
+    H / 2 + (layer.offsetY + (layer.zoomOffsetY ?? 0)) * H)
   ctx.rotate((rot * Math.PI) / 180)
   ctx.scale(sx, sy)
   ctx.drawImage(item.el, source.x, source.y, srcW, srcH, -srcW / 2, -srcH / 2, srcW, srcH)

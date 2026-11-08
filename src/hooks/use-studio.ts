@@ -16,12 +16,17 @@ import {
   downloadBlob,
   drawScene,
   drawSpanRegion,
+  getScreenFraming,
+  patchScreenFraming,
+  setScreensLinked,
   getMediaFrom,
   getSpanLayout,
   getExportSceneSize,
   pickVideoMime,
   stillFormatInfo,
   type Layer,
+  type Framing,
+  type LayoutMode,
   type MediaItem,
   type ScreenKey,
   type StillFormat,
@@ -55,6 +60,11 @@ export interface Studio {
   deviceColor: DeviceColor
   setDeviceColor: (color: DeviceColor) => void
   layer: Layer
+  activeFraming: Framing
+  activeScreen: ScreenKey
+  setActiveScreen: (screen: ScreenKey) => void
+  setLinked: (linked: boolean) => void
+  setLayout: (layout: LayoutMode) => void
   media: MediaItem[]
   video: HTMLVideoElement | null
   hasMedia: boolean
@@ -74,7 +84,7 @@ export interface Studio {
   transport: TransportState
   caps: typeof caps
 
-  updateFraming: (patch: Partial<Layer>) => void
+  updateFraming: (patch: Partial<Framing>, screen?: ScreenKey) => void
   resetFraming: () => void
   openPicker: () => void
   onFileInputChange: (event: ChangeEvent<HTMLInputElement>) => void
@@ -102,6 +112,7 @@ export interface Studio {
 export function useStudio(): Studio {
   const [deviceColor, setDeviceColor] = useState<DeviceColor>(DEFAULT_DEVICE_COLOR)
   const [layer, setLayer] = useState<Layer>(() => defaultLayer())
+  const [activeScreen, setActiveScreen] = useState<ScreenKey>('top')
   const [media, setMedia] = useState<MediaItem[]>([])
   const [stillFormat, setStillFormatState] = useState<StillFormat>('png')
   const [quality, setQualityState] = useState(0.92)
@@ -162,16 +173,42 @@ export function useStudio(): Studio {
   const hasMedia = !!wallpaper
 
   /* ---------------------------------------------------------------- *
-   * Shared framing
+   * Linked and per-screen framing
    * ---------------------------------------------------------------- */
 
-  const updateFraming = (patch: Partial<Layer>) => {
+  const activeFraming = getScreenFraming(layer, activeScreen)
+
+  const updateFraming = (patch: Partial<Framing>, screen: ScreenKey = activeScreen) => {
     if (exportingRef.current || restoringRef.current) return
-    commitLayer({ ...layerRef.current, ...patch })
+    commitLayer(patchScreenFraming(layerRef.current, patch, screen))
+    setActiveScreen(screen)
+  }
+
+  const setLinked = (linked: boolean) => {
+    if (exportingRef.current || restoringRef.current) return
+    commitLayer(setScreensLinked(layerRef.current, linked))
+  }
+
+  const setLayout = (layout: LayoutMode) => {
+    if (exportingRef.current || restoringRef.current) return
+    commitLayer({ ...layerRef.current, layout })
   }
 
   const resetFraming = () => {
-    updateFraming({ fit: 'cover', zoom: 1, offsetX: 0, offsetY: 0, rotation: 0 })
+    if (exportingRef.current || restoringRef.current) return
+    const framing = { fit: 'cover' as const, zoom: 1, offsetX: 0, offsetY: 0, rotation: 0, zoomOffsetX: 0, zoomOffsetY: 0 }
+    if (!layerRef.current.linked) {
+      updateFraming(framing)
+      return
+    }
+    const current = layerRef.current
+    commitLayer({
+      ...current, ...framing,
+      screenFraming: current.screenFraming ? {
+        top: { ...current.screenFraming.top, ...framing },
+        bottom: { ...current.screenFraming.bottom, ...framing },
+      } : null,
+    })
   }
 
   /* ---------------------------------------------------------------- *
@@ -497,7 +534,7 @@ export function useStudio(): Studio {
     const scene = createExportScene(layout)
     const sceneCtx = scene.getContext('2d', { alpha: false })
     if (!sceneCtx) return false
-    drawScene(sceneCtx, framing, item)
+    drawScene(sceneCtx, getScreenFraming(framing, key), item)
 
     const canvas = document.createElement('canvas')
     canvas.width = region.width
@@ -555,7 +592,7 @@ export function useStudio(): Studio {
     if (!sceneCtx) return false
 
     const paintFrame = () => {
-      drawScene(sceneCtx, framing, item)
+      drawScene(sceneCtx, getScreenFraming(framing, key), item)
       drawSpanRegion(ctx, scene, key, layout)
     }
 
@@ -741,7 +778,8 @@ export function useStudio(): Studio {
 
   const spanPreviewRef = useRef<HTMLCanvasElement | null>(null)
   const previewMediaIdRef = useRef<string | null>(null)
-  const [previewCrossfade] = useState(createPreviewCrossfade)
+  const [previewCrossfades] = useState(() => ({ top: createPreviewCrossfade(), bottom: createPreviewCrossfade() }))
+  const cancelPreviewCrossfades = () => SCREEN_KEYS.forEach((key) => previewCrossfades[key].cancel())
 
   const paintSpanPreviews = (now: number, allowMotion: boolean) => {
     const layout = getSpanLayout(layerRef.current)
@@ -754,24 +792,28 @@ export function useStudio(): Studio {
     if (resized) {
       off.width = width
       off.height = height
-      previewCrossfade.cancel()
+      cancelPreviewCrossfades()
     }
     const sceneCtx = off.getContext('2d')
     const item = getMedia(layerRef.current.mediaId)
     if (!sceneCtx) return
     const mediaId = item?.id ?? null
-    if (mediaId !== previewMediaIdRef.current) {
-      if (hadPreview && !resized && allowMotion) previewCrossfade.capture(off, now)
-      else previewCrossfade.cancel()
-      previewMediaIdRef.current = mediaId
-    }
-    drawScene(sceneCtx, layerRef.current, item)
-    previewCrossfade.paint(sceneCtx, now)
+    const mediaChanged = mediaId !== previewMediaIdRef.current
+    previewMediaIdRef.current = mediaId
     for (const key of SCREEN_KEYS) {
       const canvas = canvasRefs[key].current
       const ctx = canvas?.getContext('2d')
       if (!canvas || !ctx) continue
+      const crossfade = previewCrossfades[key]
+      if (mediaChanged) {
+        if (hadPreview && !resized && allowMotion) crossfade.capture(canvas, now)
+        else crossfade.cancel()
+      }
+      // Separate scene renders prevent resampling from blending the other
+      // screen's framing into the edges of this screen's crop.
+      drawScene(sceneCtx, getScreenFraming(layerRef.current, key), item)
       drawSpanRegion(ctx, off, key, layout)
+      crossfade.paint(ctx, now)
     }
   }
 
@@ -780,7 +822,7 @@ export function useStudio(): Studio {
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
     const onMotionChange = () => {
       if (!motion.matches) return
-      previewCrossfade.cancel()
+      cancelPreviewCrossfades()
       dirtyRef.current = true
     }
     motion.addEventListener('change', onMotionChange)
@@ -790,7 +832,7 @@ export function useStudio(): Studio {
       const player = activeItem?.type === 'video' ? (activeItem.el as HTMLVideoElement) : null
       const animate = activeItem?.animated || (player && !player.paused && !player.ended)
 
-      if (dirtyRef.current || animate || previewCrossfade.active) {
+      if (dirtyRef.current || animate || SCREEN_KEYS.some((key) => previewCrossfades[key].active)) {
         paintSpanPreviews(now, !motion.matches)
         dirtyRef.current = false
       }
@@ -816,7 +858,7 @@ export function useStudio(): Studio {
     return () => {
       cancelAnimationFrame(raf)
       motion.removeEventListener('change', onMotionChange)
-      previewCrossfade.cancel()
+      cancelPreviewCrossfades()
     }
     // Refs are intentionally read directly; the loop lives for the app lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -867,6 +909,11 @@ export function useStudio(): Studio {
     deviceColor,
     setDeviceColor,
     layer,
+    activeFraming,
+    activeScreen,
+    setActiveScreen,
+    setLinked,
+    setLayout,
     media,
     video,
     hasMedia,

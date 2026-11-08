@@ -3,6 +3,7 @@ import {
   defaultLayer,
   normalizeGapMm,
   type Layer,
+  type Framing,
   type MediaItem,
   type StillFormat,
   type VideoOutput,
@@ -43,10 +44,26 @@ function numberInRange(value: unknown, fallback: number, min: number, max: numbe
   return typeof value === 'number' && Number.isFinite(value) ? clamp(value, min, max) : fallback
 }
 
+function normalizeFraming(value: unknown, defaults: Framing): Framing {
+  const framing = isRecord(value) ? value : {}
+  return {
+    fit: framing.fit === 'cover' || framing.fit === 'contain' || framing.fit === 'stretch' ? framing.fit : defaults.fit,
+    zoom: numberInRange(framing.zoom, defaults.zoom, 0.5, 4),
+    offsetX: numberInRange(framing.offsetX, defaults.offsetX, -1, 1),
+    offsetY: numberInRange(framing.offsetY, defaults.offsetY, -1, 1),
+    rotation: framing.rotation === 0 || framing.rotation === 90 || framing.rotation === 180 || framing.rotation === 270 ? framing.rotation : defaults.rotation,
+    bg: typeof framing.bg === 'string' && /^#[0-9a-f]{6}$/i.test(framing.bg) ? framing.bg : defaults.bg,
+    ...(framing.zoomOffsetX === undefined ? {} : { zoomOffsetX: numberInRange(framing.zoomOffsetX, 0, -1000, 1000) }),
+    ...(framing.zoomOffsetY === undefined ? {} : { zoomOffsetY: numberInRange(framing.zoomOffsetY, 0, -1000, 1000) }),
+  }
+}
+
 export function normalizeWorkspaceSettings(value: unknown): WorkspaceSettings {
   const settings = isRecord(value) ? value : {}
   const layer = isRecord(settings.layer) ? settings.layer : {}
   const defaults = defaultLayer()
+  const framing = normalizeFraming(layer, defaults)
+  const screens = isRecord(layer.screenFraming) ? layer.screenFraming : null
   // A saved pre-feature layer must keep its original split and framing.
   const layoutMode = isRecord(settings.layer) && layer.layout !== 'physical'
     ? 'continuous' : defaults.layout
@@ -57,12 +74,12 @@ export function normalizeWorkspaceSettings(value: unknown): WorkspaceSettings {
       layout: layoutMode,
       gapMm: typeof layer.gapMm === 'number' ? normalizeGapMm(layer.gapMm) : defaults.gapMm,
       mediaId: typeof layer.mediaId === 'string' ? layer.mediaId : null,
-      fit: layer.fit === 'contain' || layer.fit === 'stretch' ? layer.fit : 'cover',
-      zoom: numberInRange(layer.zoom, defaults.zoom, 0.5, 4),
-      offsetX: numberInRange(layer.offsetX, defaults.offsetX, -1, 1),
-      offsetY: numberInRange(layer.offsetY, defaults.offsetY, -1, 1),
-      rotation: layer.rotation === 90 || layer.rotation === 180 || layer.rotation === 270 ? layer.rotation : 0,
-      bg: typeof layer.bg === 'string' && /^#[0-9a-f]{6}$/i.test(layer.bg) ? layer.bg : defaults.bg,
+      ...framing,
+      linked: layer.linked !== false,
+      screenFraming: screens || layer.linked === false ? {
+        top: normalizeFraming(screens?.top, framing),
+        bottom: normalizeFraming(screens?.bottom, framing),
+      } : null,
     },
     stillFormat: settings.stillFormat === 'jpeg' || settings.stillFormat === 'webp' ? settings.stillFormat : 'png',
     quality: numberInRange(settings.quality, 0.92, 0.5, 1),
