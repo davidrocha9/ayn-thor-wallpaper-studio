@@ -168,11 +168,11 @@ test('gap UI is removed and crop actions belong only to individual library items
     assert.equal(await tools.getByRole('slider', { name: 'Screen gap', exact: true }).count(), 0)
     assert.doesNotMatch(await tools.innerText(), /Source guide|Skips the hinge area|fine-tune for your device/)
     assert.equal(await page.locator('.media-tile').getByRole('button', { name: 'Crop calibration.svg', exact: true }).count(), 1)
-    await tools.getByRole('radio', { name: 'Continuous', exact: true }).click()
+    await tools.getByRole('radio', { name: 'Without screen gap', exact: true }).click()
     await page.waitForFunction(() => document.querySelector('.control-panel')?.dataset.storageStatus === 'saved')
     await page.reload()
     await ready(page)
-    assert.equal(await tools.getByRole('radio', { name: 'Continuous', exact: true }).getAttribute('aria-checked'), 'true')
+    assert.equal(await tools.getByRole('radio', { name: 'Without screen gap', exact: true }).getAttribute('aria-checked'), 'true')
     const dialog = await openCrop(page, 'calibration.svg')
     assert.equal(await dialog.getByRole('spinbutton', { name: 'Screen gap (mm)' }).count(), 0)
     assert.equal(await dialog.getByText('Screen alignment', { exact: true }).count(), 0)
@@ -401,12 +401,12 @@ test('old saved compositions restore in continuous mode until explicitly changed
     await ready(page)
     await importCalibration(page)
     const tools = page.locator('.control-panel')
-    assert.equal(await tools.getByRole('radio', { name: 'Continuous', exact: true }).getAttribute('aria-checked'), 'true')
+    assert.equal(await tools.getByRole('radio', { name: 'Without screen gap', exact: true }).getAttribute('aria-checked'), 'true')
     assert.equal(await tools.getByRole('radio', { name: 'Stretch', exact: true }).getAttribute('data-state'), 'on')
     assert.equal(await tools.getByRole('slider', { name: 'Zoom', exact: true }).getAttribute('aria-valuenow'), '130')
-    await tools.getByText('Physical', { exact: true }).click()
+    await tools.getByText('With screen gap', { exact: true }).click()
     assert.equal(await tools.getByRole('radio', { name: 'Stretch', exact: true }).getAttribute('data-state'), 'on')
-    assert.equal(await tools.getByRole('radio', { name: 'Physical', exact: true }).getAttribute('aria-checked'), 'true')
+    assert.equal(await tools.getByRole('radio', { name: 'With screen gap', exact: true }).getAttribute('aria-checked'), 'true')
     assert.deepEqual(errors, [])
   } finally { await context.close() }
 })
@@ -418,19 +418,19 @@ test('all fits remain available and unchanged across alignment switches and relo
     const tools = page.locator('.control-panel')
     for (const fit of ['Cover', 'Contain', 'Stretch']) {
       await tools.getByRole('radio', { name: fit, exact: true }).click()
-      for (const layout of ['Continuous', 'Physical']) {
-        await tools.getByRole('radio', { name: layout, exact: true }).click()
+      for (const [layout, label] of [['continuous', 'Without screen gap'], ['physical', 'With screen gap']]) {
+        await tools.getByRole('radio', { name: label, exact: true }).click()
         for (const option of ['Cover', 'Contain', 'Stretch']) {
           assert.equal(await tools.getByRole('radio', { name: option, exact: true }).isVisible(), true)
         }
         assert.equal(await tools.getByRole('radio', { name: fit, exact: true }).getAttribute('aria-checked'), 'true')
         const saved = await savedWorkspace(page)
         assert.equal(saved.settings.layer.fit, fit.toLowerCase())
-        assert.equal(saved.settings.layer.layout, layout.toLowerCase())
+        assert.equal(saved.settings.layer.layout, layout)
         await page.reload()
         await ready(page)
         assert.equal(await tools.getByRole('radio', { name: fit, exact: true }).getAttribute('aria-checked'), 'true')
-        assert.equal(await tools.getByRole('radio', { name: layout, exact: true }).getAttribute('aria-checked'), 'true')
+        assert.equal(await tools.getByRole('radio', { name: label, exact: true }).getAttribute('aria-checked'), 'true')
       }
     }
     await screenshot(page, 'independent-fit-alignment.png')

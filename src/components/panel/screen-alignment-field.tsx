@@ -21,8 +21,8 @@ export function ScreenAlignmentField() {
           updateFraming({ layout: value })
         }}
       >
-        <ToggleGroupItem value="physical" className={itemClass}>Physical</ToggleGroupItem>
-        <ToggleGroupItem value="continuous" className={itemClass}>Continuous</ToggleGroupItem>
+        <ToggleGroupItem value="physical" className={itemClass}>With screen gap</ToggleGroupItem>
+        <ToggleGroupItem value="continuous" className={itemClass}>Without screen gap</ToggleGroupItem>
       </ToggleGroup>
     </Field>
   )

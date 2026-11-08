@@ -36,13 +36,13 @@ Free to use, works on desktop and mobile, and processes your files locally in yo
 
 ### Source size and screen alignment
 
-New workspaces use **Physical** alignment: the two screen regions account for their different pixel densities and skip the image area behind the hinge and bezels. Physical alignment uses a **16 mm** gap by default, the midpoint of an approximate **15–17 mm** owner measurement. Screen proportions are derived from AYN’s advertised 6-inch and 3.92-inch diagonals; alignment is approximate and can vary with viewing angle and launcher scaling.
+New workspaces use **With screen gap**: the two screen regions account for their different pixel densities and skip the image area behind the hinge and bezels. This mode uses a **16 mm** gap by default, the midpoint of an approximate **15–17 mm** owner measurement. Screen proportions are derived from AYN’s advertised 6-inch and 3.92-inch diagonals; alignment is approximate and can vary with viewing angle and launcher scaling.
 
 At the default gap, **about 1920 × 2257** is a useful source shape. Larger sources with the same aspect ratio provide more detail, and other dimensions work too: Cover crops the excess, while Contain keeps the full source with a backdrop. Cropping is reversible for images, videos, and animated GIFs: a saved source selection is applied to previews and exported frames while the original stays intact. Applying a crop does not encode a new source file or use another library slot.
 
 Cover, Contain, and Stretch are available in either alignment. Switching alignment preserves your selected fit; Stretch fills the scene by distorting the source.
 
-**Continuous** alignment retains the original **1920 × 2160** split without gap or pixel-density compensation. Existing saved workspaces keep this mode until you explicitly switch them. Setting the gap to zero in Physical mode does not reproduce Continuous mode.
+**Without screen gap** retains the original **1920 × 2160** split without gap or pixel-density compensation. Existing saved workspaces keep this mode until you explicitly switch them. The two modes also differ in pixel-density compensation, not just the hidden gap.
 
 Images export as **PNG, JPEG, or WebP**. Videos can export as a still frame or a **2–15 second clip** at 30 or 60 fps. Clip support and format depend on your browser; Chrome or Edge is recommended. Keep the tab visible while recording a clip.
 
