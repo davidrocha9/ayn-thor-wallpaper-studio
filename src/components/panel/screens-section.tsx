@@ -5,6 +5,7 @@ import { useStudioContext } from '@/components/studio-context'
 import { FITS, type Fit } from '@/lib/thor'
 import { BackdropField } from './backdrop-field'
 import { DeviceColorField } from './device-color-field'
+import { ScreenAlignmentField } from './screen-alignment-field'
 import { Field, FieldTop, Section } from './section'
 
 const segmentedClass =
@@ -14,12 +15,13 @@ const segmentItemClass =
   'h-8 flex-1 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-background/60 hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm'
 
 export function ScreensSection() {
-  const { layer, hasMedia, updateFraming } = useStudioContext()
-  const disabled = !hasMedia
+  const { layer, hasMedia, exporting, updateFraming } = useStudioContext()
+  const disabled = !hasMedia || exporting
 
   return (
     <Section className="flex flex-1 flex-col justify-between gap-3 border-0 py-0 [&>*]:mt-0">
       <DeviceColorField />
+      <ScreenAlignmentField />
       <Field>
         <FieldTop
           label="Fit"

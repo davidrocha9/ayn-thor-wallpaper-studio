@@ -28,7 +28,7 @@ function App() {
             </main>
           </div>
 
-          <footer className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-4 pb-[max(12px,env(safe-area-inset-bottom))]">
+          <footer className="pointer-events-none absolute inset-x-0 top-full flex justify-center px-4 pb-[max(12px,env(safe-area-inset-bottom))] min-[1100px]:top-auto min-[1100px]:bottom-0">
             <Button asChild variant="ghost" className="pointer-events-auto min-h-11 gap-2 text-xs text-muted-foreground">
               <a href="https://github.com/davidrocha9/ayn-thor-wallpaper-studio" target="_blank" rel="noopener noreferrer">
                 <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="size-4">

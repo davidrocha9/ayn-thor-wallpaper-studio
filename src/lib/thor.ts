@@ -5,6 +5,8 @@
  * All processing happens locally in the browser.
  * ------------------------------------------------------------------ */
 
+import type { CropRect } from './crop.ts'
+
 export const SCREENS = {
   top: { key: 'top', label: 'Top', width: 1920, height: 1080, ratio: '16:9' },
   bottom: { key: 'bottom', label: 'Bottom', width: 1240, height: 1080, ratio: '31:27' },
@@ -29,6 +31,48 @@ export const SPAN_CANVAS = {
   },
 } as const
 
+export type LayoutMode = 'physical' | 'continuous'
+
+export interface SpanLayout {
+  width: number
+  height: number
+  regions: Record<ScreenKey, { x: number; y: number; width: number; height: number }>
+}
+
+export const DEFAULT_GAP_MM = 16
+export const MAX_GAP_MM = 50
+
+// AYN's advertised diagonals. The gap is user-measured, not an official spec.
+const topPixelsPerMm = Math.hypot(1920, 1080) / (6 * 25.4)
+const bottomPixelsPerMm = Math.hypot(1240, 1080) / (3.92 * 25.4)
+const bottomScale = topPixelsPerMm / bottomPixelsPerMm
+
+export function normalizeGapMm(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.min(MAX_GAP_MM, value)) : DEFAULT_GAP_MM
+}
+
+/** One coordinate system for the crop editor, previews, and both export paths. */
+export function getSpanLayout(layer: Pick<Layer, 'layout' | 'gapMm'>): SpanLayout {
+  if (layer.layout === 'continuous') return SPAN_CANVAS
+  const width = SCREENS.bottom.width * bottomScale
+  const height = SCREENS.bottom.height * bottomScale
+  const y = SCREENS.top.height + normalizeGapMm(layer.gapMm) * topPixelsPerMm
+  return {
+    width: SCREENS.top.width,
+    height: y + height,
+    regions: {
+      top: SPAN_CANVAS.regions.top,
+      bottom: { x: (SCREENS.top.width - width) / 2, y, width, height },
+    },
+  }
+}
+
+/** Rasterize at the denser display's scale so its export doesn't lose source detail. */
+export function getExportSceneSize(layout: SpanLayout) {
+  const scale = Math.max(...SCREEN_KEYS.map((key) => SCREENS[key].width / layout.regions[key].width))
+  return { width: Math.ceil(layout.width * scale), height: Math.ceil(layout.height * scale) }
+}
+
 export const MAX_MEDIA = 24
 
 export const FITS = ['cover', 'contain', 'stretch'] as const
@@ -39,6 +83,8 @@ export type VideoOutput = 'still' | 'clip'
 export type MediaKind = 'image' | 'video'
 
 export interface Layer {
+  layout: LayoutMode
+  gapMm: number
   mediaId: string | null
   fit: Fit
   zoom: number
@@ -60,9 +106,13 @@ export interface MediaItem {
   duration: number
   thumbUrl: string
   animated: boolean
+  sourceCrop?: CropRect
+  cropAspectLocked?: boolean
 }
 
 export const defaultLayer = (): Layer => ({
+  layout: 'physical',
+  gapMm: DEFAULT_GAP_MM,
   mediaId: null,
   fit: 'cover',
   zoom: 1,
@@ -96,11 +146,14 @@ export function drawSpanRegion(
   ctx: CanvasRenderingContext2D,
   scene: HTMLCanvasElement,
   key: ScreenKey,
+  layout: SpanLayout = SPAN_CANVAS,
 ) {
-  const region = SPAN_CANVAS.regions[key]
-  const scaleX = scene.width / SPAN_CANVAS.width
-  const scaleY = scene.height / SPAN_CANVAS.height
+  const region = layout.regions[key]
+  const scaleX = scene.width / layout.width
+  const scaleY = scene.height / layout.height
   ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(
     scene,
     region.x * scaleX,
@@ -144,6 +197,9 @@ export function drawScene(
     srcH = img.naturalHeight || img.height
   }
   if (!srcW || !srcH) return
+  const source = item.sourceCrop ?? { x: 0, y: 0, width: srcW, height: srcH }
+  srcW = source.width
+  srcH = source.height
 
   const rot = ((layer.rotation % 360) + 360) % 360
   const swap = rot === 90 || rot === 270
@@ -178,7 +234,7 @@ export function drawScene(
   ctx.translate(W / 2 + layer.offsetX * W, H / 2 + layer.offsetY * H)
   ctx.rotate((rot * Math.PI) / 180)
   ctx.scale(sx, sy)
-  ctx.drawImage(item.el, -srcW / 2, -srcH / 2, srcW, srcH)
+  ctx.drawImage(item.el, source.x, source.y, srcW, srcH, -srcW / 2, -srcH / 2, srcW, srcH)
   ctx.restore()
   ctx.setTransform(1, 0, 0, 1, 0, 0)
 }

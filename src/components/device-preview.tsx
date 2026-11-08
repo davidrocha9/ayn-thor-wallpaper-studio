@@ -1,12 +1,22 @@
+import type { CSSProperties } from 'react'
+
 import { ScreenFrame } from '@/components/screen-frame'
 import { useStudioContext } from '@/components/studio-context'
+import { defaultLayer, getSpanLayout } from '@/lib/thor'
+
+const physicalLayout = getSpanLayout(defaultLayer())
+const screenProportions = {
+  '--thor-bottom-screen-ratio': physicalLayout.regions.bottom.width / physicalLayout.width,
+} as CSSProperties
 
 export function DevicePreview() {
-  const { deviceColor } = useStudioContext()
+  const { deviceColor, isRestoring } = useStudioContext()
+
+  if (isRestoring) return <div className="stage-inner" aria-busy="true" />
 
   return (
-    <div className="stage-inner">
-      <div className="device" data-device-color={deviceColor}>
+    <div className="stage-inner" aria-busy="false">
+      <div className="device" data-device-color={deviceColor} style={screenProportions}>
         <div className="deck deck-top">
           <div className="lid-glass">
             <ScreenFrame screenKey="top" />

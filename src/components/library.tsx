@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, ImageIcon, LoaderCircle, Trash2, Upload } from 'lucide-react'
 
+import { CropDialog } from '@/components/crop-dialog'
 import { useStudioContext } from '@/components/studio-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -74,9 +75,12 @@ export function Library() {
                   </div>
                   <div className="w-full shrink-0 truncate px-2 py-2 text-[11px]">{item.name}</div>
                 </button>
-                <Button type="button" variant="secondary" size="icon-xs" onClick={() => removeMedia(item.id)} aria-label={`Remove ${item.name} from library`} disabled={importing} className="absolute top-1 right-1 size-5 bg-card/95 text-destructive hover:bg-destructive/10 hover:text-destructive">
-                  <Trash2 className="size-3" aria-hidden="true" />
-                </Button>
+                <div className="absolute top-1 right-1 flex gap-1">
+                  <CropDialog item={item} />
+                  <Button type="button" variant="secondary" size="icon-xs" onClick={() => removeMedia(item.id)} aria-label={`Remove ${item.name} from library`} disabled={importing} className="size-6 bg-card/95 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                    <Trash2 className="size-3" aria-hidden="true" />
+                  </Button>
+                </div>
               </div>
             )
           })}

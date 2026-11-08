@@ -2,14 +2,14 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type RefObject 
 import { toast } from 'sonner'
 
 import { useLocalWorkspace, type StorageStatus } from '@/hooks/use-local-workspace'
-import { disposeMedia, isMediaFile, loadMedia, waitForVideoFrame } from '@/lib/media'
+import { disposeMedia, isMediaFile, loadMedia, waitForVideoFrame, withSourceCrop } from '@/lib/media'
+import type { CropRect } from '@/lib/crop'
 import { DEFAULT_DEVICE_COLOR, type DeviceColor } from '@/lib/device-colors'
 import { createPreviewCrossfade } from '@/lib/preview-crossfade'
 import {
   MAX_MEDIA,
   SCREENS,
   SCREEN_KEYS,
-  SPAN_CANVAS,
   caps,
   clamp,
   defaultLayer,
@@ -17,16 +17,27 @@ import {
   drawScene,
   drawSpanRegion,
   getMediaFrom,
+  getSpanLayout,
+  getExportSceneSize,
   pickVideoMime,
   stillFormatInfo,
   type Layer,
   type MediaItem,
   type ScreenKey,
   type StillFormat,
+  type SpanLayout,
   type VideoOutput,
 } from '@/lib/thor'
 
 const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
+
+function createExportScene(layout: SpanLayout): HTMLCanvasElement {
+  const size = getExportSceneSize(layout)
+  const scene = document.createElement('canvas')
+  scene.width = size.width
+  scene.height = size.height
+  return scene
+}
 
 export interface ProgressState {
   open: boolean
@@ -68,6 +79,7 @@ export interface Studio {
   openPicker: () => void
   onFileInputChange: (event: ChangeEvent<HTMLInputElement>) => void
   applyMedia: (id: string) => void
+  applyCrop: (id: string, selection: CropRect, aspectLocked: boolean) => boolean
   removeMedia: (id: string) => void
   clearMedia: () => void
 
@@ -154,6 +166,7 @@ export function useStudio(): Studio {
    * ---------------------------------------------------------------- */
 
   const updateFraming = (patch: Partial<Layer>) => {
+    if (exportingRef.current || restoringRef.current) return
     commitLayer({ ...layerRef.current, ...patch })
   }
 
@@ -181,6 +194,16 @@ export function useStudio(): Studio {
         player.pause()
       }
     }
+  }
+
+  const applyCrop = (id: string, selection: CropRect, aspectLocked: boolean): boolean => {
+    const item = getMedia(id)
+    if (!item || importingRef.current || restoringRef.current || exportingRef.current) return false
+    const updated = withSourceCrop(item, selection, aspectLocked)
+    commitMedia(mediaRef.current.map((entry) => entry.id === id ? updated : entry))
+    if (layerRef.current.mediaId !== id) applyMedia(id)
+    toast(updated.sourceCrop ? 'Crop applied.' : 'Original restored.')
+    return true
   }
 
   const handleFiles = async (fileList: FileList | File[]) => {
@@ -457,8 +480,8 @@ export function useStudio(): Studio {
     }
   }
 
-  const exportStill = async (key: ScreenKey) => {
-    const item = getMedia(layerRef.current.mediaId)
+  const exportStill = async (key: ScreenKey, framing: Layer) => {
+    const item = getMedia(framing.mediaId)
     if (!item) {
       toast('Nothing to export yet.')
       return false
@@ -469,20 +492,19 @@ export function useStudio(): Studio {
       return false
     }
 
-    const region = SPAN_CANVAS.regions[key]
-    const scene = document.createElement('canvas')
-    scene.width = SPAN_CANVAS.width
-    scene.height = SPAN_CANVAS.height
+    const region = SCREENS[key]
+    const layout = getSpanLayout(framing)
+    const scene = createExportScene(layout)
     const sceneCtx = scene.getContext('2d', { alpha: false })
     if (!sceneCtx) return false
-    drawScene(sceneCtx, layerRef.current, item)
+    drawScene(sceneCtx, framing, item)
 
     const canvas = document.createElement('canvas')
     canvas.width = region.width
     canvas.height = region.height
     const ctx = canvas.getContext('2d', { alpha: false })
     if (!ctx) return false
-    drawSpanRegion(ctx, scene, key)
+    drawSpanRegion(ctx, scene, key, layout)
 
     const { mime, ext } = stillFormatInfo(stillFormatRef.current)
     let blob: Blob | null = null
@@ -507,14 +529,14 @@ export function useStudio(): Studio {
     setProgress((current) => ({ ...current, pct }))
   }
 
-  const exportClip = async (key: ScreenKey) => {
+  const exportClip = async (key: ScreenKey, framing: Layer) => {
     if (!caps.clip) {
       toast('Video recording is not supported in this browser.')
-      return exportStill(key)
+      return exportStill(key, framing)
     }
 
-    const item = getMedia(layerRef.current.mediaId)
-    if (!item || item.type !== 'video') return exportStill(key)
+    const item = getMedia(framing.mediaId)
+    if (!item || item.type !== 'video') return exportStill(key, framing)
 
     const def = SCREENS[key]
     const video = item.el as HTMLVideoElement
@@ -527,15 +549,14 @@ export function useStudio(): Studio {
     const ctx = canvas.getContext('2d', { alpha: false })
     if (!ctx) return false
 
-    const scene = document.createElement('canvas')
-    scene.width = SPAN_CANVAS.width
-    scene.height = SPAN_CANVAS.height
+    const layout = getSpanLayout(framing)
+    const scene = createExportScene(layout)
     const sceneCtx = scene.getContext('2d', { alpha: false })
     if (!sceneCtx) return false
 
     const paintFrame = () => {
-      drawScene(sceneCtx, layerRef.current, item)
-      drawSpanRegion(ctx, scene, key)
+      drawScene(sceneCtx, framing, item)
+      drawSpanRegion(ctx, scene, key, layout)
     }
 
     const ready = await ensureFrameReady(item)
@@ -685,6 +706,7 @@ export function useStudio(): Studio {
       return
     }
 
+    const framing = { ...layerRef.current }
     beginExport()
     let count = 0
     let canceled = false
@@ -695,7 +717,7 @@ export function useStudio(): Studio {
           break
         }
         const clip = wantsClip()
-        const ok = clip ? await exportClip(key) : await exportStill(key)
+        const ok = clip ? await exportClip(key, framing) : await exportStill(key, framing)
         if (ok) count += 1
         if (!clip) await delay(650)
       }
@@ -721,25 +743,25 @@ export function useStudio(): Studio {
   const previewMediaIdRef = useRef<string | null>(null)
   const [previewCrossfade] = useState(createPreviewCrossfade)
 
-  const getSpanPreview = () => {
-    if (!spanPreviewRef.current) {
-      const off = document.createElement('canvas')
-      off.width = SPAN_CANVAS.width / 2
-      off.height = SPAN_CANVAS.height / 2
-      spanPreviewRef.current = off
-    }
-    return spanPreviewRef.current
-  }
-
   const paintSpanPreviews = (now: number, allowMotion: boolean) => {
+    const layout = getSpanLayout(layerRef.current)
     const hadPreview = spanPreviewRef.current !== null
-    const off = getSpanPreview()
+    const off = spanPreviewRef.current ?? document.createElement('canvas')
+    spanPreviewRef.current = off
+    const width = Math.round(layout.width / 2)
+    const height = Math.round(layout.height / 2)
+    const resized = off.width !== width || off.height !== height
+    if (resized) {
+      off.width = width
+      off.height = height
+      previewCrossfade.cancel()
+    }
     const sceneCtx = off.getContext('2d')
     const item = getMedia(layerRef.current.mediaId)
     if (!sceneCtx) return
     const mediaId = item?.id ?? null
     if (mediaId !== previewMediaIdRef.current) {
-      if (hadPreview && allowMotion) previewCrossfade.capture(off, now)
+      if (hadPreview && !resized && allowMotion) previewCrossfade.capture(off, now)
       else previewCrossfade.cancel()
       previewMediaIdRef.current = mediaId
     }
@@ -749,7 +771,7 @@ export function useStudio(): Studio {
       const canvas = canvasRefs[key].current
       const ctx = canvas?.getContext('2d')
       if (!canvas || !ctx) continue
-      drawSpanRegion(ctx, off, key)
+      drawSpanRegion(ctx, off, key, layout)
     }
   }
 
@@ -869,6 +891,7 @@ export function useStudio(): Studio {
     openPicker,
     onFileInputChange,
     applyMedia,
+    applyCrop,
     removeMedia,
     clearMedia,
 

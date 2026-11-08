@@ -1,4 +1,5 @@
 import type { MediaItem } from './thor'
+import { normalizeCropRect, type CropRect } from './crop.ts'
 
 export function isMediaFile(file: File): boolean {
   return file.type.startsWith('image/') || file.type.startsWith('video/')
@@ -56,21 +57,21 @@ export function waitForVideoFrame(video: HTMLVideoElement, timeout = 12_000): Pr
   })
 }
 
-function videoThumb(video: HTMLVideoElement): string {
+function mediaThumb(element: CanvasImageSource, source: CropRect): string {
   try {
     const canvas = document.createElement('canvas')
     canvas.width = 208
     canvas.height = 117
     const ctx = canvas.getContext('2d')
     if (!ctx) return ''
-    const vw = video.videoWidth || 16
-    const vh = video.videoHeight || 9
+    const vw = source.width
+    const vh = source.height
     const scale = Math.max(canvas.width / vw, canvas.height / vh)
     const w = vw * scale
     const h = vh * scale
     ctx.fillStyle = '#000'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
-    ctx.drawImage(video, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h)
+    ctx.drawImage(element, source.x, source.y, source.width, source.height, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h)
     return canvas.toDataURL('image/jpeg', 0.75)
   } catch {
     return ''
@@ -87,7 +88,30 @@ export function disposeMedia(item: MediaItem) {
   URL.revokeObjectURL(item.url)
 }
 
-export async function loadMedia(file: File, id: string = crypto.randomUUID()): Promise<MediaItem> {
+/** The decoded element always retains the original source, even after cropping. */
+export function getSourceMedia(item: MediaItem): MediaItem {
+  const width = item.type === 'video'
+    ? (item.el as HTMLVideoElement).videoWidth
+    : (item.el as HTMLImageElement).naturalWidth
+  const height = item.type === 'video'
+    ? (item.el as HTMLVideoElement).videoHeight
+    : (item.el as HTMLImageElement).naturalHeight
+  return { ...item, width: width || item.width, height: height || item.height, sourceCrop: undefined }
+}
+
+export function withSourceCrop(item: MediaItem, value?: CropRect, aspectLocked = true): MediaItem {
+  const original = getSourceMedia(item)
+  const full = { x: 0, y: 0, width: original.width, height: original.height }
+  const rect = value ? normalizeCropRect(value, original.width, original.height) : full
+  const sourceCrop = rect.x === 0 && rect.y === 0 && rect.width === full.width && rect.height === full.height ? undefined : rect
+  return {
+    ...original, sourceCrop, cropAspectLocked: typeof aspectLocked === 'boolean' ? aspectLocked : true,
+    width: rect.width, height: rect.height,
+    thumbUrl: !sourceCrop && item.type === 'image' ? item.url : mediaThumb(item.el, rect),
+  }
+}
+
+export async function loadMedia(file: File, id: string = crypto.randomUUID(), sourceCrop?: CropRect, cropAspectLocked = true): Promise<MediaItem> {
   const url = URL.createObjectURL(file)
   const base = {
     file,
@@ -105,7 +129,7 @@ export async function loadMedia(file: File, id: string = crypto.randomUUID()): P
   try {
     if (file.type.startsWith('image/')) {
       const image = await loadImage(url)
-      return {
+      return withSourceCrop({
         ...base,
         type: 'image',
         el: image,
@@ -113,7 +137,7 @@ export async function loadMedia(file: File, id: string = crypto.randomUUID()): P
         height: image.naturalHeight || image.height || 1,
         thumbUrl: url,
         animated: file.type === 'image/gif',
-      }
+      }, sourceCrop, cropAspectLocked)
     }
 
     if (file.type.startsWith('video/')) {
@@ -162,14 +186,14 @@ export async function loadMedia(file: File, id: string = crypto.randomUUID()): P
         width: video.videoWidth || 1,
         height: video.videoHeight || 1,
         duration: Number.isFinite(video.duration) ? video.duration : 0,
-        thumbUrl: videoThumb(video),
+        thumbUrl: mediaThumb(video, { x: 0, y: 0, width: video.videoWidth || 16, height: video.videoHeight || 9 }),
       }
       try {
         video.currentTime = 0
       } catch {
         /* ignore */
       }
-      return item
+      return withSourceCrop(item, sourceCrop, cropAspectLocked)
     }
 
     throw new Error('Unsupported file type')

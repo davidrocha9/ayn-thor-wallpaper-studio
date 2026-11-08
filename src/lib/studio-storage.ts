@@ -1,12 +1,14 @@
 import {
   clamp,
   defaultLayer,
+  normalizeGapMm,
   type Layer,
   type MediaItem,
   type StillFormat,
   type VideoOutput,
 } from './thor.ts'
 
+import type { CropRect } from './crop.ts'
 import { DEFAULT_DEVICE_COLOR, isDeviceColor, type DeviceColor } from './device-colors.ts'
 
 const DATABASE = 'thor-wallpaper-studio'
@@ -29,6 +31,8 @@ export interface StoredMedia {
   type: string
   lastModified: number
   blob: Blob
+  sourceCrop?: CropRect
+  cropAspectLocked?: boolean
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -43,10 +47,15 @@ export function normalizeWorkspaceSettings(value: unknown): WorkspaceSettings {
   const settings = isRecord(value) ? value : {}
   const layer = isRecord(settings.layer) ? settings.layer : {}
   const defaults = defaultLayer()
+  // A saved pre-feature layer must keep its original split and framing.
+  const layoutMode = isRecord(settings.layer) && layer.layout !== 'physical'
+    ? 'continuous' : defaults.layout
 
   return {
     deviceColor: isDeviceColor(settings.deviceColor) ? settings.deviceColor : DEFAULT_DEVICE_COLOR,
     layer: {
+      layout: layoutMode,
+      gapMm: typeof layer.gapMm === 'number' ? normalizeGapMm(layer.gapMm) : defaults.gapMm,
       mediaId: typeof layer.mediaId === 'string' ? layer.mediaId : null,
       fit: layer.fit === 'contain' || layer.fit === 'stretch' ? layer.fit : 'cover',
       zoom: numberInRange(layer.zoom, defaults.zoom, 0.5, 4),
@@ -148,13 +157,28 @@ export async function saveWorkspace(media: MediaItem[], settings: WorkspaceSetti
         if (!ids.has(String(key)) && !preserved.has(String(key))) store.delete(key)
       }
       for (const item of media) {
-        if (existing.has(item.id)) continue
+        if (existing.has(item.id)) {
+          const request = store.get(item.id)
+          request.onsuccess = () => {
+            try {
+              const saved = request.result as StoredMedia
+              const crop = { sourceCrop: item.sourceCrop, cropAspectLocked: item.cropAspectLocked }
+              const previous = { sourceCrop: saved.sourceCrop, cropAspectLocked: saved.cropAspectLocked }
+              if (JSON.stringify(crop) !== JSON.stringify(previous)) store.put({ ...saved, ...crop })
+            } catch {
+              transaction.abort()
+            }
+          }
+          continue
+        }
         store.put({
           id: item.id,
           name: item.file.name,
           type: item.file.type,
           lastModified: item.file.lastModified,
           blob: item.file,
+          sourceCrop: item.sourceCrop,
+          cropAspectLocked: item.cropAspectLocked,
         } satisfies StoredMedia)
       }
     } catch {

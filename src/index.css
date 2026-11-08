@@ -285,7 +285,9 @@
   :is(.studio-shell, [data-slot="dialog-content"]) [data-slot="slider-thumb"]::after {
     inset: -12px;
   }
-  .studio-shell input:not([type="radio"]) {
+  .studio-shell input:not([type="radio"]),
+  [data-slot="dialog-content"] input,
+  [data-slot="dialog-content"] select {
     min-height: 44px;
     font-size: 16px;
   }
@@ -379,7 +381,9 @@
   left: 50%;
   top: 6%;
   transform: translateX(-50%);
-  width: 50%;
+  /* Match the active top display: lid padding 0.8%, glass padding 3.3%.
+     Scale by physical display widths, not their differing pixel counts. */
+  width: calc((100% - 1.6cqw) * 0.934 * var(--thor-bottom-screen-ratio));
 }
 .deck-center .screen-frame {
   border-radius: 0.6cqw;
@@ -560,8 +564,14 @@
   cursor: grab;
   touch-action: none;
 }
-.screen-frame.is-dragging {
+.screen-frame.is-dragging,
+.crop-surface.is-dragging {
   cursor: grabbing;
+}
+.crop-surface {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
 .screen-frame canvas {
   display: block;

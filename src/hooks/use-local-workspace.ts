@@ -35,7 +35,7 @@ export function useLocalWorkspace({ media, settings, onRestore }: LocalWorkspace
           if (!active) return
           try {
             const file = new File([item.blob], item.name, { type: item.type, lastModified: item.lastModified })
-            loaded.push(await loadMedia(file, item.id))
+            loaded.push(await loadMedia(file, item.id, item.sourceCrop, item.cropAspectLocked))
           } catch {
             failed.add(item.id)
           }
